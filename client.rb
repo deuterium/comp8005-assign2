@@ -2,7 +2,7 @@
 # Chris Wood - A00741285 - COMP8005 - Assignment 2
 # chriswood.ca@gmail.com
 #
-#
+# client
 
 require 'socket'
 require 'curses'
@@ -53,19 +53,22 @@ ARGV.clear
 processes = (1..numClients).map do |p|
 	Process.fork do
 		begin
-			#s = TCPSocket.open(srv.chomp, port)
+			s = TCPSocket.open(srv.chomp, port)
 			p_socket.close
 			x = 1
 			loop {
-			#	s.puts "hello world from #{Process.pid}"
+				s.puts "hello world from #{Process.pid}"
 				c_socket.send "#{p}: #{x}", 0
+				while s.gets
+					puts $_
+				end
 				x += 1
 				sleep 0.5
 			}
 		rescue
 			#socket error
 		ensure
-			#s.close
+			s.close
 		end
 	end
 end
