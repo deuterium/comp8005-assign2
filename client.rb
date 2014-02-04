@@ -12,6 +12,8 @@ default_port = 8005
 localhost = "127.0.0.1"
 p_socket, c_socket = UNIXSocket.pair
 
+
+#functions
 def update_ui(msg)
 	# width = msg.length + 6
 	# win = Curses::Window.new(5, width,
@@ -26,11 +28,8 @@ def update_ui(msg)
 	Curses.refresh
 end
 
-def init_ui
-	Curses.noecho
-	Curses.init_screen
-end
 
+#main
 if ARGV.empty? || ARGV.count > 3
 	puts "Proper usage: ./client.rb server_addr [server_port] [numClients]"
 	exit
@@ -59,9 +58,9 @@ processes = (1..numClients).map do |p|
 			x = 1
 			loop {
 			#	s.puts "hello world from #{Process.pid}"
-				c_socket.send "#{x}", 0
+				c_socket.send "#{p}: #{x}", 0
 				x += 1
-				sleep 3
+				sleep 0.5
 			}
 		rescue
 			#socket error
@@ -71,17 +70,15 @@ processes = (1..numClients).map do |p|
 	end
 end
 
-init_ui
+Curses.noecho
+Curses.init_screen
 
-
-x = 1
 while 1
 	#c_socket.close
-	#from_child = p_socket.recv(100)
-	update_ui "x is equal to: #{x}"
-	x+=1
+	from_child = p_socket.recv(100)
+	update_ui "x is equal to: #{from_child}"
 	#break if cmd.eql? "stop"
-	sleep 1
+	#sleep 1
 end
 
 processes.each {|p| Process.wait p} 
