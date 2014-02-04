@@ -6,18 +6,29 @@
 
 require 'socket'
 require 'curses'
-require 'pry'
 
 #default port
 default_port = 8005
 localhost = "127.0.0.1"
-Curses.noecho
-Curses.init_screen
+p_socket, c_socket = UNIXSocket.pair
 
-def report(txt)
-	Curses.setpos(1,0)
-	Curses.addstr(txt)
+def update_ui(msg)
+	# width = msg.length + 6
+	# win = Curses::Window.new(5, width,
+	#         (Curses.lines - 5) / 2, (Curses.cols - width) / 2)
+	# win.box(?|, ?-)
+	# win.setpos(2, 3)
+	# win.addstr(msg)
+	# win.refresh
+	# win.close
+	Curses.setpos (0,0)
+	Curses.addstr(msg)
 	Curses.refresh
+end
+
+def init_ui
+	Curses.noecho
+	Curses.init_screen
 end
 
 if ARGV.empty? || ARGV.count > 3
@@ -39,17 +50,18 @@ end
 
 ARGV.clear
 
+
 processes = (1..numClients).map do |p|
 	Process.fork do
 		begin
-			puts "starting process"
 			#s = TCPSocket.open(srv.chomp, port)
+			p_socket.close
 			x = 1
 			loop {
 			#	s.puts "hello world from #{Process.pid}"
-			binding.pry
-				puts x+1
-				report(1)
+				c_socket.send "#{x}", 0
+				x += 1
+				sleep 3
 			}
 		rescue
 			#socket error
@@ -58,10 +70,21 @@ processes = (1..numClients).map do |p|
 		end
 	end
 end
-processes.each {|p| Process.wait p} 
-while cmd = gets.chomp
-	break if cmd.eql? "stop"
+
+init_ui
+
+
+x = 1
+while 1
+	#c_socket.close
+	#from_child = p_socket.recv(100)
+	update_ui "x is equal to: #{x}"
+	x+=1
+	#break if cmd.eql? "stop"
+	sleep 1
 end
+
+processes.each {|p| Process.wait p} 
 
 
 
