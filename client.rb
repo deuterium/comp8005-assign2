@@ -1,8 +1,33 @@
 #!/usr/bin/ruby
-# Chris Wood - A00741285 - COMP8005 - Assignment 2
-# chriswood.ca@gmail.com
-#
-# client
+=begin
+-------------------------------------------------------------------------------------
+--  SOURCE FILE:    client.rb - A multi-threaded echo client
+--
+--  PROGRAM:        client 
+--                ./client.rb server_addr [server_port] [numClients]
+--
+--  FUNCTIONS:      Berkeley Socket API
+--
+--  DATE:           February 4, 2014
+--
+--  REVISIONS:      (Date and Description)
+--                  none
+--
+--
+--  DESIGNERS:      Chris Wood - chriswood.ca@gmail.com
+--
+--  PROGRAMMERS:    Chris Wood - chriswood.ca@gmail.com
+--
+--  NOTES:
+--  The program will establish a TCP connection to a user specifed server.
+--  The server can be specified using a fully qualified domain name or and
+--  IP address. After the connection has been established the user will be
+--  prompted for date. The date string is then sent to the server and the
+--  response (echo) back from the server is displayed.
+--  This client application can be used to test the aaccompanying epoll
+--  server: epoll_svr.c
+---------------------------------------------------------------------------------------
+=end
 
 require 'socket'
 require 'curses'
