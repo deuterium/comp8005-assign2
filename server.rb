@@ -54,7 +54,7 @@ loop {
 
         loop {
         	while client.gets
-        		s.puts($_)
+        		puts($_)
         	end
         }    
         client.close

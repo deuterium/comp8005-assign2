@@ -23,7 +23,7 @@ def update_ui(msg)
 	# win.addstr(msg)
 	# win.refresh
 	# win.close
-	Curses.setpos (0,0)
+	Curses.setpos(0,0)
 	Curses.addstr(msg)
 	Curses.refresh
 end
@@ -41,27 +41,24 @@ elsif ARGV.count == 2
 	srv = ARGV[0]
 	port = ARGV[1]
 	numClients = 1
-elsif ARV.count == 3
+elsif ARGV.count == 3
 	srv = ARGV[0]
 	port = ARGV[1]
-	numClients = ARGV[2]			
+	numClients = ARGV[2]
 end
 
 ARGV.clear
 
-
-processes = (1..numClients).map do |p|
-	Process.fork do
+threads = (1..numClients.to_i).map do |t|
+	Thread.new(t) do |t|
+		puts " new thread"
 		begin
 			s = TCPSocket.open(srv.chomp, port)
 			p_socket.close
 			x = 1
 			loop {
-				s.puts "hello world from #{Process.pid}"
-				c_socket.send "#{p}: #{x}", 0
-				while s.gets
-					puts $_
-				end
+				s.puts "hello world from #{Thread.current}: #{x} #{p}"
+				#c_socket.send("#{p}: #{x}", 0)
 				x += 1
 				sleep 0.5
 			}
@@ -73,21 +70,22 @@ processes = (1..numClients).map do |p|
 	end
 end
 
-Curses.noecho
-Curses.init_screen
+
+#Curses.noecho
+#Curses.init_screen
 
 while 1
 	#c_socket.close
-	from_child = p_socket.recv(100)
-	update_ui "x is equal to: #{from_child}"
+	#from_child = p_socket.recv(100)
+	#update_ui "x is equal to: #{from_child}"
 	#break if cmd.eql? "stop"
 	#sleep 1
 end
 
-processes.each {|p| Process.wait p} 
+threads.each {|t| t.join}
 
 
 
 
-Curses.close_screen
+#Curses.close_screen
 
