@@ -30,7 +30,6 @@
 =end
 
 require 'socket'
-require 'curses'
 
 #default port
 default_port = 8005
@@ -39,19 +38,6 @@ p_socket, c_socket = UNIXSocket.pair
 
 
 #functions
-def update_ui(msg)
-	# width = msg.length + 6
-	# win = Curses::Window.new(5, width,
-	#         (Curses.lines - 5) / 2, (Curses.cols - width) / 2)
-	# win.box(?|, ?-)
-	# win.setpos(2, 3)
-	# win.addstr(msg)
-	# win.refresh
-	# win.close
-	Curses.setpos(0,0)
-	Curses.addstr(msg)
-	Curses.refresh
-end
 
 
 #main
@@ -74,21 +60,23 @@ end
 
 ARGV.clear
 
-#Curses.noecho
-#Curses.init_screen
-
 threads = (1..numClients.to_i).map do |t|
 	Thread.new(t) do |t|
 		begin
 			puts "#{Thread.current} created"
+			begin
 			s = TCPSocket.open(srv.chomp, port)
+		rescue Exception => e
+			puts e.message
+		end
 			(1..5).each do |i|
 				s.puts "hello world from #{Thread.current}: #{i}"
 				#c_socket.send("#{p}: #{x}", 0)
-				sleep 0.5
+				puts "ECHO REPLY> #{s.readline}"
+				sleep 1.5
 			end
-		rescue
-			#socket error
+		rescue Exception => e
+			puts "error: #{e.message}"
 		ensure
 			s.close
 		end
@@ -98,6 +86,4 @@ end
 #wait for threads to finish, no zombies
 threads.each {|t| t.join}
 
-
-#Curses.close_screen
 

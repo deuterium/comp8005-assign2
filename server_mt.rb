@@ -30,27 +30,34 @@
 =end
 
 require 'socket'
-require 'curses'
 
-#default port
-default_port = 8005
-p_socket, c_socket = UNIXSocket.pair
-BUFF_LEN = 10
-
+#default port, initial clients, thread mutex
+default_port, @num_clients, @mutex = 8005, 0, Mutex.new
+STDOUT.sync = true
 
 #functions
-def update_ui(msg)
-	# width = msg.length + 6
-	# win = Curses::Window.new(5, width,
-	#         (Curses.lines - 5) / 2, (Curses.cols - width) / 2)
-	# win.box(?|, ?-)
-	# win.setpos(2, 3)
-	# win.addstr(msg)
-	# win.refresh
-	# win.close
-	Curses.setpos(0,0)
-	Curses.addstr(msg)
-	Curses.refresh
+def init_srv(port)
+    #
+    t = Thread.new {
+        while 1
+            system "clear"
+            @mutex.synchronize do
+                puts "SERVER CONNECTIONS> #{@num_clients}"
+            end
+            sleep 0.4
+            system "clear"
+            @mutex.synchronize do
+                puts "SERVER CONNECTIONS> #{@num_clients} ."
+            end
+            sleep 0.4
+        end
+    }
+    begin
+        srv = TCPServer.open(port)
+    rescue Exception => e
+        puts "failed to init srv: #{e.message}"
+    end 
+    return srv, t
 end
 
 
@@ -69,52 +76,68 @@ end
 #Curses.noecho
 #Curses.init_screen
 
-puts "1"
-Socket.tcp_server_loop(port) do |conn, addr|
-  Thread.new do
-    client = "#{addr.ip_address}:#{addr.ip_port}"
-    puts "#{client} is connected"
-    begin
-      loop do
-        line = conn.readline
-        puts "#{client} says: #{line}"
-        conn.puts(line)
-      end
-    rescue EOFError
-      conn.close
-      puts "#{client} has disconnected"
-    end
-  end
-end
-
-
-
-
-
 =begin
-server = TCPServer.open(port)
-loop {
-	puts "before accept"
-    Thread.start(server.accept) do |client|
-    	puts "after accept"
-        sock_domain, remote_port, 
-            remote_hostname, @remote_ip = client.peeraddr
-
-        loop {
-            puts "in cient loop"
-        	while client.gets
-        		puts($_)
-        	end
-        }    
-        client.close
+Socket.tcp_server_loop(port) do |conn, addr|
+    puts "SERVER CONNECTIONS> #{num_clients}"
+    Thread.new do
+        @mutex.synchronize do
+            num_clients += 1
+        end
+        client = "#{addr.ip_address}:#{addr.ip_port}"
+        puts "#{client} is connected"
+        begin
+            loop do
+                line = conn.readline
+                puts "#{client} says: #{line}"
+                conn.puts(line)
+            end
+        rescue EOFError
+            conn.close
+            puts "#{client} has disconnected"
+            @mutex.synchronize do
+                num_clients -= 1
+            end
+        end
     end
-}
+end
 =end
 
+server, t_id = init_srv(port)
+puts t_id
 
+loop {
+    
+    
+    Thread.start(server.accept) do |c|
+        sock_domain, remote_port, 
+            remote_hostname, @remote_ip = c.peeraddr
+        client_num = 0
 
+        @mutex.synchronize do
+            @num_clients += 1
+            client_num = @num_clients
+            #update_ui 0, num_clients
+        end
+        #puts "SERVER CONNECTIONS2> #{num_clients}"
+        #client = "#{addr.ip_address}:#{addr.ip_port}"
+        client = c.peeraddr[3]
+        #puts "#{client} is connected"
+        begin
+            loop do
+                line = c.readline
+                #puts "#{client} #{client_num} says: #{line}"
+                c.puts(line)
+            end
+        rescue EOFError
+            c.close
+            #puts "#{client} #{client_num} has disconnected"
+            @mutex.synchronize do
+                @num_clients -= 1
+            end
+        end    
 
-
+    end
+}
 
 #Curses.close_screen
 
