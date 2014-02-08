@@ -74,19 +74,19 @@ end
 
 ARGV.clear
 
+#Curses.noecho
+#Curses.init_screen
+
 threads = (1..numClients.to_i).map do |t|
 	Thread.new(t) do |t|
-		puts " new thread"
 		begin
+			puts "#{Thread.current} created"
 			s = TCPSocket.open(srv.chomp, port)
-			p_socket.close
-			x = 1
-			loop {
-				s.puts "hello world from #{Thread.current}: #{x} #{p}"
+			(1..5).each do |i|
+				s.puts "hello world from #{Thread.current}: #{i}"
 				#c_socket.send("#{p}: #{x}", 0)
-				x += 1
 				sleep 0.5
-			}
+			end
 		rescue
 			#socket error
 		ensure
@@ -95,21 +95,8 @@ threads = (1..numClients.to_i).map do |t|
 	end
 end
 
-
-#Curses.noecho
-#Curses.init_screen
-
-while 1
-	#c_socket.close
-	#from_child = p_socket.recv(100)
-	#update_ui "x is equal to: #{from_child}"
-	#break if cmd.eql? "stop"
-	#sleep 1
-end
-
+#wait for threads to finish, no zombies
 threads.each {|t| t.join}
-
-
 
 
 #Curses.close_screen

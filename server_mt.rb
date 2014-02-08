@@ -69,6 +69,29 @@ end
 #Curses.noecho
 #Curses.init_screen
 
+puts "1"
+Socket.tcp_server_loop(port) do |conn, addr|
+  Thread.new do
+    client = "#{addr.ip_address}:#{addr.ip_port}"
+    puts "#{client} is connected"
+    begin
+      loop do
+        line = conn.readline
+        puts "#{client} says: #{line}"
+        conn.puts(line)
+      end
+    rescue EOFError
+      conn.close
+      puts "#{client} has disconnected"
+    end
+  end
+end
+
+
+
+
+
+=begin
 server = TCPServer.open(port)
 loop {
 	puts "before accept"
@@ -78,6 +101,7 @@ loop {
             remote_hostname, @remote_ip = client.peeraddr
 
         loop {
+            puts "in cient loop"
         	while client.gets
         		puts($_)
         	end
@@ -85,6 +109,8 @@ loop {
         client.close
     end
 }
+=end
+
 
 
 
