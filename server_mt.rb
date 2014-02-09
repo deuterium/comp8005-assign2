@@ -31,10 +31,14 @@
 
 require 'socket'
 
-#String constants, default program port, client count
-SRV_MSG, default_port, @num_clients = "^^ Server Output ^^", 8005, 0
-#Variable locks, output key, value dictionary
-@lock, @lock2, @ctl_msg = Mutex.new, Mutex.new, Hash.new
+# String constants
+SRV_MSG, LOG_NAME, SRV_STOP, SRV_START = "^^ Server Output ^^", 
+    "server_mt_log", "User shutdown received. Stopping Server.\n", 
+    "Server started. Accepting connections.\n"
+# default port and client tracking variables
+default_port, @num_clients = 8005, 0
+# Variable locks, output key, value dictionary
+@lock, @lock2, @lock3, @ctl_msg = Mutex.new, Mutex.new, Mutex.new, Hash.new
 
 ## Functions
 # Returns the server's time
@@ -46,6 +50,29 @@ def time
     return t.strftime("%Y-%m-%d %H:%M:%S")
 end
 
+# Prints an exception's error to STDOUT
+# * *Args*    :
+#   - +e+ -> exception to have message output
+#
+def print_exception(e)
+    puts "error: #{e.message}"
+end
+
+# Log message to external file, time prepended
+# * *Args*    :
+#   - +msg+ -> msg to write to log
+#
+def log(msg)
+    begin
+        @lock3.synchronize do 
+            File.open(LOG_NAME, 'a') { |f| f.write ("#{time}: #{msg}") }
+        end
+    rescue Exception => e
+        # problem opening or writing to file
+        print_exception(e)
+    end
+end
+
 # Sets up the listening server for the program and 
 # initializes output control loop thread
 # * *Args*    :
@@ -55,89 +82,126 @@ end
 #   - +t+ -> thread id of output control loop
 #
 def init_srv(port)
-    #
+    begin
+        srv = TCPServer.open(port)
+    rescue Exception => e
+        #problem opening listening socket..probs should exit
+        print_exception(e)
+        exit!
+    end 
+    log(SRV_START)
     t = Thread.new {
         while 1
             system "clear"
-            @mutex.synchronize do
-                output_print
-                puts SRV_MSG
+            output_print
+            puts SRV_MSG
+            @lock.synchronize do
                 puts "SERVER CONNECTIONS> #{@num_clients}"
             end
-            
             sleep 0.4
+
+            # repeat output with additional .
+            # shows that its "awake"
             system "clear"
-            @mutex.synchronize do
-                output_print
-                puts SRV_MSG
+            output_print
+            puts SRV_MSG
+            @lock.synchronize do
                 puts "SERVER CONNECTIONS> #{@num_clients} ."
             end
             sleep 0.4
         end
     }
-    begin
-        srv = TCPServer.open(port)
-    rescue Exception => e
-        puts "failed to init srv: #{e.message}"
-    end 
     return srv, t
 end
 
+# Adds a message with a key to the output dictionary
+# * *Args*    :
+#   - +k+ -> key to store message under
+#   - +v+ -> message to store
+#
 def output_append(k, v)
-    @ctl_msg[k] = v
+    @lock2.synchronize do 
+        @ctl_msg[k] = v
+    end
 end
 
+# Removes a message from the output dictionary using the key
+# * *Args*    :
+#   - +k+ -> key on which to remove message
+#
 def output_remove(k)
-    @ctl_msg.delete(k)
+    @lock2.synchronize do 
+        @ctl_msg.delete(k)
+    end
 end
 
+# Iterates the output dictionary and outputs only the values
+#
 def output_print
-    @ctl_msg.each {|k, v| puts v}
+    @lock2.synchronize do 
+        @ctl_msg.each {|k, v| puts v}
+    end
 end
 
-#main
+## Main
 STDOUT.sync = true
 
 if ARGV.count > 1
     puts "Proper usage: ./server.rb [listening_port]"
     exit
-elsif ARGV.empty?
+elsif ARGV.empty? # default port
     port = default_port
 else
-    port = ARGV[0]
+    port = ARGV[0] # custom port
     ARGV.clear
 end
 
+# thread id of ui control loop saved incase need to use it in future
+# program iterations
 server, t_id = init_srv(port)
-puts t_id
 
+# Server loop
 loop {
-    
-    Thread.start(server.accept) do |c|
-        sock_domain, remote_port, 
-            remote_hostname, @remote_ip = c.peeraddr
-        client_num = 0
-
-        @mutex.synchronize do
-            @num_clients += 1
-            client_num = @num_clients
+    # blocking call 
+    begin
+        Thread.start(server.accept) do |c|
+            sock_domain, remote_port, 
+                remote_hostname, @remote_ip = c.peeraddr
+            # local to thread client ID
+            client_num = 0
+            @lock.synchronize do
+                # BAD => currently could end up with duplicates if one disconnections
+                # and another joins
+                @num_clients += 1
+                client_num = @num_clients
+            end
+            client = c.peeraddr[3] # remote_hostname
+            output_append("#{client} #{client_num}", "#{client} #{client_num} is connected")
+            begin
+                loop do
+                    line = c.readline
+                    c.puts(line)
+                    log("#{client} #{client_num}: #{line}")
+                end
+            rescue EOFError # client disconnected
+                c.close
+                @lock.synchronize do
+                    @num_clients -= 1
+                end
+                output_remove("#{client} #{client_num}")
+            rescue Exception => e
+                # problem reading or writing to/from client
+                print_exception(e)
+            end    
         end
-        client = c.peeraddr[3]
-        output_append("#{client} #{client_num}", "#{client} #{client_num} is connected")
-        begin
-            loop do
-                line = c.readline
-                #puts "#{client} #{client_num} says: #{line}"
-                c.puts(line)
-            end
-        rescue EOFError
-            c.close
-            @mutex.synchronize do
-                @num_clients -= 1
-            end
-            output_remove("#{client} #{client_num}")
-        end    
-
+    rescue SignalException => c # ctrl-c
+        log(SRV_STOP)
+        system("clear")
+        puts SRV_STOP
+        exit!
+    rescue Exception => e
+        #problem opening client socket
+        print_exception(e)
     end
 }
 
