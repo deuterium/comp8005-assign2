@@ -32,21 +32,36 @@
 require 'socket'
 
 #default port, initial clients, thread mutex
+SRV_MSG = "^^ Server Output ^^"
 default_port, @num_clients, @mutex = 8005, 0, Mutex.new
 STDOUT.sync = true
+#@ctl_msg = Array.new(["Server Output:"])
+@ctl_msg = Hash.new
 
 #functions
+#Returns the system time (format YYYY-MM-DD HH:MM:SS)
+def time
+    t = Time.now
+    return t.strftime("%Y-%m-%d %H:%M:%S")
+end
+
 def init_srv(port)
     #
     t = Thread.new {
         while 1
             system "clear"
             @mutex.synchronize do
+                output_print
+                puts SRV_MSG
                 puts "SERVER CONNECTIONS> #{@num_clients}"
+                
             end
+            
             sleep 0.4
             system "clear"
             @mutex.synchronize do
+                output_print
+                puts SRV_MSG
                 puts "SERVER CONNECTIONS> #{@num_clients} ."
             end
             sleep 0.4
@@ -60,6 +75,17 @@ def init_srv(port)
     return srv, t
 end
 
+def output_append(k, v)
+    @ctl_msg[k] = v
+end
+
+def output_remove(k)
+    @ctl_msg.delete(k)
+end
+
+def output_print
+    @ctl_msg.each {|k, v| puts v}
+end
 
 #main
 if ARGV.count > 1
@@ -72,41 +98,10 @@ else
     ARGV.clear
 end
 
-
-#Curses.noecho
-#Curses.init_screen
-
-=begin
-Socket.tcp_server_loop(port) do |conn, addr|
-    puts "SERVER CONNECTIONS> #{num_clients}"
-    Thread.new do
-        @mutex.synchronize do
-            num_clients += 1
-        end
-        client = "#{addr.ip_address}:#{addr.ip_port}"
-        puts "#{client} is connected"
-        begin
-            loop do
-                line = conn.readline
-                puts "#{client} says: #{line}"
-                conn.puts(line)
-            end
-        rescue EOFError
-            conn.close
-            puts "#{client} has disconnected"
-            @mutex.synchronize do
-                num_clients -= 1
-            end
-        end
-    end
-end
-=end
-
 server, t_id = init_srv(port)
 puts t_id
 
 loop {
-    
     
     Thread.start(server.accept) do |c|
         sock_domain, remote_port, 
@@ -116,12 +111,9 @@ loop {
         @mutex.synchronize do
             @num_clients += 1
             client_num = @num_clients
-            #update_ui 0, num_clients
         end
-        #puts "SERVER CONNECTIONS2> #{num_clients}"
-        #client = "#{addr.ip_address}:#{addr.ip_port}"
         client = c.peeraddr[3]
-        #puts "#{client} is connected"
+        output_append("#{client} #{client_num}", "#{client} #{client_num} is connected")
         begin
             loop do
                 line = c.readline
@@ -130,14 +122,12 @@ loop {
             end
         rescue EOFError
             c.close
-            #puts "#{client} #{client_num} has disconnected"
             @mutex.synchronize do
                 @num_clients -= 1
             end
+            output_remove("#{client} #{client_num}")
         end    
 
     end
 }
-
-#Curses.close_screen
 
