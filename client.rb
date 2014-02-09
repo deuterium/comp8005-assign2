@@ -6,12 +6,12 @@
 --  PROGRAM:        client 
 --                ./client.rb server_addr [server_port] [numClients]
 --
---  FUNCTIONS:      Berkeley Socket API
+--  FUNCTIONS:      Ruby Socket & Thread Classes
 --
 --  DATE:           February 4, 2014
 --
 --  REVISIONS:      (Date and Description)
---                  none
+--                  none, initial version
 --
 --
 --  DESIGNERS:      Chris Wood - chriswood.ca@gmail.com
@@ -21,11 +21,14 @@
 --  NOTES:
 --  The program will establish a TCP connection to a user specifed server.
 --  The server can be specified using a fully qualified domain name or and
---  IP address. After the connection has been established the user will be
---  prompted for date. The date string is then sent to the server and the
---  response (echo) back from the server is displayed.
---  This client application can be used to test the aaccompanying epoll
---  server: epoll_svr.c
+--  IP address. By default, the program will create 1 thread. The user can 
+--  specify the number of threads to run. After the connection has been 
+--  established, each thread will send a string to the server 5 times and 
+--  the response (echo) back from the server is displayed.
+--  This client application can be used to test the accompanying servers:
+--  server_mt.rb (multithreaded)
+--  server_select.rb (select)
+--  server_epoll.rb (epoll)
 ---------------------------------------------------------------------------------------
 =end
 
@@ -39,6 +42,11 @@ default_port = 8005
 def time
 	t = Time.now
 	return t.strftime("%Y-%m-%d %H:%M:%S")
+end
+
+#Prints an exception's error to STDOUT
+def print_exception(e)
+	puts "error: #{e.message}"
 end
 
 ##main
@@ -66,19 +74,25 @@ threads = (1..numClients.to_i).map do |t|
 	Thread.new(t) do |t|
 		begin
 			puts "#{time} T#:#{t} ID:#{Thread.current} created"
-			begin
+			#connect to server, create socket
 			s = TCPSocket.open(srv.chomp, port)
 		rescue Exception => e
-			puts e.message
+			#error with server connection
+			print_exception(e)
+			exit!
 		end
+		begin
+			#echo 5 messages
 			(1..5).each do |i|
 				s.puts "hello world from #{Thread.current}: #{i}"
 				puts "SERVER REPLY> #{s.readline}"
 				sleep(rand(1..3))
 			end
 		rescue Exception => e
-			puts "error: #{e.message}"
+			#error sending or receiving message from server
+			print_exception(e)
 		ensure
+			#ensure socket closes
 			s.close
 			puts "#{time} T#:#{t} ID:#{Thread.current} ended"
 		end
