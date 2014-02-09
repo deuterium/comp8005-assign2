@@ -34,22 +34,28 @@
 
 require 'socket'
 
-#default port for program
+# default port for program
 default_port = 8005
 
-##functions
-#Returns the system time (format YYYY-MM-DD HH:MM:SS)
+## Functions
+# Returns the server's time
+# * *Returns* :
+#   - the system time (format YYYY-MM-DD HH:MM:SS)
+#
 def time
 	t = Time.now
 	return t.strftime("%Y-%m-%d %H:%M:%S")
 end
 
-#Prints an exception's error to STDOUT
+# Prints an exception's error to STDOUT
+# * *Args*    :
+#   - +e+ -> exception to have message output
+#
 def print_exception(e)
 	puts "error: #{e.message}"
 end
 
-##main
+## Main
 if ARGV.empty? || ARGV.count > 3
 	puts "Proper usage: ./client.rb server_addr [server_port] [numClients]"
 	exit
@@ -67,37 +73,37 @@ elsif ARGV.count == 3 #custom srv/port/# of clients
 	numClients = ARGV[2]
 end
 
-#clear for STDIN, if applicable
+# clear for STDIN, if applicable
 ARGV.clear
 
 threads = (1..numClients.to_i).map do |t|
 	Thread.new(t) do |t|
 		begin
 			puts "#{time} T#:#{t} ID:#{Thread.current} created"
-			#connect to server, create socket
+			# connect to server, create socket
 			s = TCPSocket.open(srv.chomp, port)
 		rescue Exception => e
-			#error with server connection
+			# error with server connection
 			print_exception(e)
 			exit!
 		end
 		begin
-			#echo 5 messages
+			# send 5 messages
 			(1..5).each do |i|
 				s.puts "hello world from #{Thread.current}: #{i}"
 				puts "SERVER REPLY> #{s.readline}"
 				sleep(rand(1..3))
 			end
 		rescue Exception => e
-			#error sending or receiving message from server
+			# error sending or receiving message from server
 			print_exception(e)
 		ensure
-			#ensure socket closes
+			# ensure socket closes
 			s.close
 			puts "#{time} T#:#{t} ID:#{Thread.current} ended"
 		end
 	end
 end
 
-#wait for threads to finish, no zombies
+# wait for threads to finish, no zombies
 threads.each {|t| t.join}

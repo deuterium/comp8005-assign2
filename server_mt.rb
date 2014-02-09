@@ -11,7 +11,7 @@
 --  DATE:           February 4, 2014
 --
 --  REVISIONS:      (Date and Description)
---                  none
+--                  none, initial version
 --
 --
 --  DESIGNERS:      Chris Wood - chriswood.ca@gmail.com
@@ -19,32 +19,41 @@
 --  PROGRAMMERS:    Chris Wood - chriswood.ca@gmail.com
 --
 --  NOTES:
---  The program will establish a TCP connection to a user specifed server.
---  The server can be specified using a fully qualified domain name or and
---  IP address. After the connection has been established the user will be
---  prompted for date. The date string is then sent to the server and the
---  response (echo) back from the server is displayed.
---  This client application can be used to test the aaccompanying epoll
---  server: epoll_svr.c
+--  The program will accept TCP connections from clients.
+--  The program will read data from the client socket and simply echo it back.
+--  This server program is multi-threaded, with a blocking server accept call.
+--  1 thread is used for a server output thread. Data should be thread-safe
+--  with the use of mutexes.
+--  This server application can be used with the aaccompanying threaded 
+--  client: client.rb
 ---------------------------------------------------------------------------------------
 =end
 
 require 'socket'
 
-#default port, initial clients, thread mutex
-SRV_MSG = "^^ Server Output ^^"
-default_port, @num_clients, @mutex = 8005, 0, Mutex.new
-STDOUT.sync = true
-#@ctl_msg = Array.new(["Server Output:"])
-@ctl_msg = Hash.new
+#String constants, default program port, client count
+SRV_MSG, default_port, @num_clients = "^^ Server Output ^^", 8005, 0
+#Variable locks, output key, value dictionary
+@lock, @lock2, @ctl_msg = Mutex.new, Mutex.new, Hash.new
 
-#functions
-#Returns the system time (format YYYY-MM-DD HH:MM:SS)
+## Functions
+# Returns the server's time
+# * *Returns* :
+#   - the system time (format YYYY-MM-DD HH:MM:SS)
+#
 def time
     t = Time.now
     return t.strftime("%Y-%m-%d %H:%M:%S")
 end
 
+# Sets up the listening server for the program and 
+# initializes output control loop thread
+# * *Args*    :
+#   - +port+ -> port to turn the listening server on
+# * *Returns* :
+#   - +srv+ -> server listening socket
+#   - +t+ -> thread id of output control loop
+#
 def init_srv(port)
     #
     t = Thread.new {
@@ -54,7 +63,6 @@ def init_srv(port)
                 output_print
                 puts SRV_MSG
                 puts "SERVER CONNECTIONS> #{@num_clients}"
-                
             end
             
             sleep 0.4
@@ -88,6 +96,8 @@ def output_print
 end
 
 #main
+STDOUT.sync = true
+
 if ARGV.count > 1
     puts "Proper usage: ./server.rb [listening_port]"
     exit
