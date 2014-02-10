@@ -10,9 +10,7 @@
 --
 --  DATE:           February 4, 2014
 --
---  REVISIONS:      (Date and Description)
---                  none, initial version
---
+--  REVISIONS:      See development repo: https://github.com/deuterium/comp8005-assign2
 --
 --  DESIGNERS:      Chris Wood - chriswood.ca@gmail.com
 --
@@ -30,6 +28,7 @@
 =end
 
 require 'socket'
+require 'thread'
 
 # String constants
 SRV_MSG, MAX_CON, LOG_NAME, SRV_STOP, SRV_START =

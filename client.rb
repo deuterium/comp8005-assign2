@@ -10,9 +10,7 @@
 --
 --  DATE:           February 4, 2014
 --
---  REVISIONS:      (Date and Description)
---                  none, initial version
---
+--  REVISIONS:      See development repo: https://github.com/deuterium/comp8005-assign2
 --
 --  DESIGNERS:      Chris Wood - chriswood.ca@gmail.com
 --
@@ -33,9 +31,14 @@
 =end
 
 require 'socket'
+require 'thread'
 
 # default port for program
 default_port = 8005
+# String constants
+LOG_NAME = "client_log"
+# variable locks
+@lock = Mutex.new
 
 ## Functions
 # Returns the server's time
@@ -53,6 +56,21 @@ end
 #
 def print_exception(e)
 	puts "error: #{e.message}"
+end
+
+# Log message to external file, time prepended
+# * *Args*    :
+#   - +msg+ -> msg to write to log
+#
+def log(msg)
+    begin
+        @lock.synchronize do 
+            File.open(LOG_NAME, 'a') { |f| f.write ("#{time},#{msg}") }
+        end
+    rescue Exception => e
+        # problem opening or writing to file
+        print_exception(e)
+    end
 end
 
 ## Main
@@ -76,6 +94,9 @@ end
 # clear for STDIN, if applicable
 ARGV.clear
 
+# send 3-15 messages
+num_messages = rand(3..15)
+
 threads = (1..numClients.to_i).map do |t|
 	Thread.new(t) do |t|
 		begin
@@ -88,10 +109,12 @@ threads = (1..numClients.to_i).map do |t|
 			exit!
 		end
 		begin
-			# send 5 messages
-			(1..5).each do |i|
+			(1..num_messages).each do |i|
+
 				s.puts "hello world from #{Thread.current}: #{i}"
-				puts "SERVER REPLY> #{s.readline}"
+
+				resp = s.readline
+				puts "SERVER REPLY> #{resp}"
 				sleep(rand(1..3))
 			end
 		rescue Exception => e
@@ -107,3 +130,5 @@ end
 
 # wait for threads to finish, no zombies
 threads.each {|t| t.join}
+
+puts threads
