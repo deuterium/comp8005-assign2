@@ -32,10 +32,10 @@
 require 'socket'
 
 # String constants
-SRV_MSG, MAX_CON, LOG_NAME, SRV_STOP, SRV_START, XFER_LOG =
+SRV_MSG, MAX_CON, LOG_NAME, SRV_STOP, SRV_START =
     "^^ Server Output ^^", "Total clients connected",
     "server_mt_log", "User shutdown received. Stopping Server.\n", 
-    "Server started. Accepting connections.\n", "transfer_stats"
+    "Server started. Accepting connections.\n"
 # default port and client tracking variables
 default_port, @num_clients, @max_clients = 8005, 0, 0
 # Variable locks,
@@ -169,7 +169,7 @@ end
 #
 def xfer_out
     @lock4.synchronize do
-        File.open(XFER_LOG, 'a') { |f| 
+        File.open(LOG_NAME, 'a') { |f| 
             @xfer.each { |k, v|
                 f.write("#{k},#{v}\n")
             }
@@ -251,9 +251,9 @@ loop {
             end    
         end
     rescue SignalException => c # ctrl-c => SERVER SHUTDOWN
+        log(SRV_STOP)
         xfer_append(MAX_CON, @max_clients)
         xfer_total
-        log(SRV_STOP)
         xfer_out
         system("clear")
         puts SRV_STOP
