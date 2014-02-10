@@ -32,13 +32,16 @@
 require 'socket'
 
 # String constants
-SRV_MSG, LOG_NAME, SRV_STOP, SRV_START = "^^ Server Output ^^", 
+SRV_MSG, MAX_CON, LOG_NAME, SRV_STOP, SRV_START, XFER_LOG =
+    "^^ Server Output ^^", "Total clients connected",
     "server_mt_log", "User shutdown received. Stopping Server.\n", 
-    "Server started. Accepting connections.\n"
+    "Server started. Accepting connections.\n", "transfer_stats"
 # default port and client tracking variables
-default_port, @num_clients = 8005, 0
-# Variable locks, output key, value dictionary
-@lock, @lock2, @lock3, @ctl_msg = Mutex.new, Mutex.new, Mutex.new, Hash.new
+default_port, @num_clients, @max_clients = 8005, 0, 0
+# Variable locks,
+@lock, @lock2, @lock3, @lock4 = Mutex.new, Mutex.new, Mutex.new, Mutex.new
+# output & data transfer key/value dictionary
+@ctl_msg, @xfer = Hash.new, Hash.new
 
 ## Functions
 # Returns the server's time
@@ -143,6 +146,53 @@ def output_print
     end
 end
 
+# Adds a message with a key to the transfer dictionary.
+# This is used to track the amount of data received
+# and sent to each client.
+# * *Args*    :
+#   - +k+ -> key to store message under
+#   - +v+ -> message to store
+#
+def xfer_append(k, v)
+    @lock4.synchronize do 
+        @xfer[k] = v
+    end
+end
+
+# Logs the contents of the xfer dictionary.
+# This is will allow to statistical tracking
+# of data received and sent per client.
+#
+def xfer_out
+    @lock4.synchronize do
+        File.open(XFER_LOG, 'a') { |f| 
+            @xfer.each { |k, v|
+                f.write("#{k},#{v}\n")
+            }
+        }
+    end
+end
+
+# Totals the xfer stats stored in the xfer dictionary.
+#
+def xfer_total
+    t_in, t_out = 0, 0
+    @lock4.synchronize do
+        @xfer.each { |k, v|
+            if k.include? "_IN"
+                t_in += v
+            elsif k.include? "_OUT"
+                t_out += v
+            end     
+        }
+    end
+
+    xfer_append("Total bytes transfered in", t_in)
+    xfer_append("Total bytes transfered out", t_out)
+    xfer_append("Total bytes transfered", t_in+t_out)
+end
+
+
 ## Main
 STDOUT.sync = true
 
@@ -173,29 +223,36 @@ loop {
                 # BAD => currently could end up with duplicates if one disconnections
                 # and another joins
                 @num_clients += 1
+                @max_clients += 1
                 client_num = @num_clients
             end
             client = c.peeraddr[3] # remote_hostname
-            output_append("#{client} #{client_num}", "#{client} #{client_num} is connected")
+            client_id = "#{client}-#{client_num}-#{rand(0..500)}"
+            output_append(client_id, "#{client} is connected")
             begin
                 loop do
                     line = c.readline
+                    xfer_append("#{client_id}_IN", line.bytesize)
                     c.puts(line)
-                    log("#{client} #{client_num}: #{line}")
+                    xfer_append("#{client_id}_OUT", line.bytesize)
+                    log("#{client_id}: #{line}")
                 end
             rescue EOFError # client disconnected
                 c.close
                 @lock.synchronize do
                     @num_clients -= 1
                 end
-                output_remove("#{client} #{client_num}")
+                output_remove(client_id)
             rescue Exception => e
                 # problem reading or writing to/from client
                 print_exception(e)
             end    
         end
-    rescue SignalException => c # ctrl-c
+    rescue SignalException => c # ctrl-c => SERVER SHUTDOWN
+        xfer_append(MAX_CON, @max_clients)
+        xfer_total
         log(SRV_STOP)
+        xfer_out
         system("clear")
         puts SRV_STOP
         exit!
