@@ -155,7 +155,11 @@ end
 #
 def xfer_append(k, v)
     @lock4.synchronize do 
-        @xfer[k] = v
+        if @xfer[k] == nil # does not exist
+            @xfer[k] = v
+        else               # exists
+            @xfer[k] += v
+        end
     end
 end
 
@@ -220,8 +224,6 @@ loop {
             # local to thread client ID
             client_num = 0
             @lock.synchronize do
-                # BAD => currently could end up with duplicates if one disconnections
-                # and another joins
                 @num_clients += 1
                 @max_clients += 1
                 client_num = @num_clients
