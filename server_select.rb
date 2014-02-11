@@ -1,12 +1,12 @@
 #!/usr/bin/env ruby
 =begin
 -------------------------------------------------------------------------------------
---  SOURCE FILE:    server_mt.rb - A multi-threaded echo server
+--  SOURCE FILE:    server_select.rb - A multi-threaded echo server using IO.select
 --
---  PROGRAM:        server_mt
---                ./server_mt.rb [listening_port] 
+--  PROGRAM:        server_select
+--                ./server_select.rb [listening_port] 
 --
---  FUNCTIONS:      Ruby Threads, Ruby Sockets
+--  FUNCTIONS:      Ruby Threads, Ruby Sockets, Ruby IO.Select
 --
 --  DATE:           February 4, 2014
 --
@@ -19,7 +19,7 @@
 --  NOTES:
 --  The program will accept TCP connections from clients.
 --  The program will read data from the client socket and simply echo it back.
---  This server program is multi-threaded, with a blocking server accept call.
+--  This server program is multi-threaded, with a blocking select accept call.
 --  1 thread is used for a server output thread. Data should be thread-safe
 --  with the use of mutexes.
 --  This server application can be used with the aaccompanying threaded 
@@ -34,14 +34,17 @@ require 'thread'
 # String constants
 SRV_MSG, MAX_CON, LOG_NAME, SRV_STOP, SRV_START =
     "^^ Server Output ^^", "Total clients connected",
-    "server_mt_log", "User shutdown received. Stopping Server.\n", 
+    "server_select_log", "User shutdown received. Stopping Server.\n", 
     "Server started. Accepting connections.\n"
 # default port and client tracking variables
 default_port, @num_clients, @max_clients = 8005, 0, 0
 # Variable locks,
-@lock, @lock2, @lock3, @lock4 = Mutex.new, Mutex.new, Mutex.new, Mutex.new
+@lock, @lock2, @lock3, @lock4, @lock5 = 
+    Mutex.new, Mutex.new, Mutex.new, Mutex.new, Mutex.new
 # output & data transfer key/value dictionary
 @ctl_msg, @xfer = Hash.new, Hash.new
+# stream arrays for select
+@reading, @writing = Array.new, Array.new
 
 ## Functions
 # Returns the server's time
@@ -93,6 +96,7 @@ def init_srv(port)
         exit!
     end 
     log(SRV_START)
+
     t = Thread.new {
         while 1
             system "clear"
@@ -212,55 +216,77 @@ end
 
 # thread id of ui control loop saved incase need to use it in future
 # program iterations
-server, t_id = init_srv(port)
+@server, t_id = init_srv(port)
+@reading.push(@server)
 
 # Server loop
 loop {
-    # blocking call 
-    begin
-        Thread.start(server.accept) do |c|
-            sock_domain, remote_port, 
-                remote_hostname, @remote_ip = c.peeraddr
-            # local to thread client ID
-            client_num = 0
-            @lock.synchronize do
-                @num_clients += 1
-                @max_clients += 1
-                client_num = @num_clients
-            end
-            client = c.peeraddr[3] # remote_hostname
-            client_id = "#{client}-#{client_num}-#{rand(0..500)}"
-            output_append(client_id, "#{client} is connected")
-            begin
-                loop do
-                    line = c.readline
-                    xfer_append("#{client_id}_IN", line.bytesize)
-                    c.puts(line)
-                    xfer_append("#{client_id}_OUT", line.bytesize)
-                    log("#{client_id}: #{line}")
-                end
-            rescue EOFError # client disconnected
-                c.close
-                @lock.synchronize do
-                    @num_clients -= 1
-                end
-                output_remove(client_id)
-            rescue Exception => e
-                # problem reading or writing to/from client
-                print_exception(e)
-            end    
-        end
+    begin 
+        @lock5.synchronize {
+            # blocking call?
+            @readable, writable = IO.select(@reading, @writing)
+        }
+    rescue IOError
+        # assume this is coming from select trying to read sockets before
+        # thread has a chance to close it
     rescue SignalException => c # ctrl-c => SERVER SHUTDOWN
-        log(SRV_STOP)
-        xfer_append(MAX_CON, @max_clients)
-        xfer_total
-        xfer_out
-        system("clear")
-        puts SRV_STOP
-        exit!
+                log(SRV_STOP)
+                xfer_append(MAX_CON, @max_clients)
+                xfer_total
+                xfer_out
+                system("clear")
+                puts SRV_STOP
+                exit!
     rescue Exception => e
-        #problem opening client socket
         print_exception(e)
+    end
+    @readable.each do |socket|
+        if socket == @server
+            begin
+                Thread.start(@server.accept_nonblock) do |c|
+                    @lock5.synchronize {
+                        @reading.push(c) # add to array of sockets
+                    }
+                    
+                    sock_domain, remote_port, 
+                        remote_hostname, @remote_ip = c.peeraddr
+                    # local to thread client ID
+                    client_num = 0
+                    @lock.synchronize do
+                        @num_clients += 1
+                        @max_clients += 1
+                        client_num = @num_clients
+                    end
+                    client = c.peeraddr[3] # remote_hostname
+                    client_id = "#{client}-#{client_num}-#{rand(0..500)}"
+                    output_append(client_id, "#{client} is connected")
+                    begin
+                        loop do
+                            line = c.readline
+                            xfer_append("#{client_id}_IN", line.bytesize)
+                            c.puts(line)
+                            xfer_append("#{client_id}_OUT", line.bytesize)
+                            log("#{client_id}: #{line}")
+                        end
+                    rescue EOFError # client disconnected
+                        c.close
+                        @lock5.synchronize {
+                            @reading.delete(c)
+                        }
+                        @lock.synchronize do
+                            @num_clients -= 1
+                        end
+                        output_remove(client_id)
+                    rescue Exception => e
+                        # problem reading or writing to/from client
+                        print_exception(e)
+                    end    
+                end
+            rescue Exception => e
+                #problem opening client socket
+                print_exception(e)
+            end
+        end
     end
 }
 
