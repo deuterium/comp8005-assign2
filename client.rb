@@ -160,11 +160,16 @@ end
 # wait for threads to finish, no zombies
 threads.each {|t| t.join}
 
-
+# calculate time difference between send + receive and verbose
 @data.each {
 	|k,v|
 	temp = v.split(',')
 	diff = Time.parse(temp[3]) - Time.parse(temp[1])
 	puts "#{k}\t#{v}\tRTT: #{diff}sec"
-	File.open("#{LOG_NAME}#{time2}", 'a') { |f| f.write ("#{k}\t#{v}\tRTT: #{diff}sec") }
+	begin
+		File.open("#{LOG_NAME}#{time2}", 'a') { |f| f.write ("#{k}\t#{v}\tRTT: #{diff}sec") }
+	rescue Exception => e
+		# problem opening/writing to file
+		print_exception(e)
+	end
 }
