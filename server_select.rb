@@ -1,12 +1,12 @@
 #!/usr/bin/env ruby
 =begin
 -------------------------------------------------------------------------------------
---  SOURCE FILE:    server_select.rb - A multi-threaded echo server using IO.select
+--  SOURCE FILE:    server_epoll.rb - A multi-threaded echo server using IO.select
 --
---  PROGRAM:        server_select
---                ./server_select.rb [listening_port] 
+--  PROGRAM:        server_epoll
+--                ./server_epoll.rb [listening_port] 
 --
---  FUNCTIONS:      Ruby Threads, Ruby Sockets, Ruby IO.Select
+--  FUNCTIONS:      Ruby Sockets, Ruby EventMachine(epoll)
 --
 --  DATE:           February 4, 2014
 --
@@ -19,7 +19,7 @@
 --  NOTES:
 --  The program will accept TCP connections from clients.
 --  The program will read data from the client socket and simply echo it back.
---  This server program is multi-threaded, with a blocking select accept call.
+--  This server program is multi-threaded, with a event driven accept call.
 --  1 thread is used for a server output thread. Data should be thread-safe
 --  with the use of mutexes.
 --  This server application can be used with the aaccompanying threaded 
@@ -34,7 +34,7 @@ require 'thread'
 # String constants
 SRV_MSG, MAX_CON, LOG_NAME, SRV_STOP, SRV_START =
     "^^ Server Output ^^", "Total clients connected",
-    "server_select_log", "User shutdown received. Stopping Server.\n", 
+    "server_epoll_log", "User shutdown received. Stopping Server.\n", 
     "Server started. Accepting connections.\n"
 # default port and client tracking variables
 default_port, @num_clients, @max_clients = 8005, 0, 0

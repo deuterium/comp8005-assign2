@@ -19,7 +19,7 @@
 --  NOTES:
 --  The program will accept TCP connections from clients.
 --  The program will read data from the client socket and simply echo it back.
---  This server program is multi-threaded, with a blocking server accept call.
+--  This server program is multi-threaded with a blocking server accept call.
 --  1 thread is used for a server output thread. Data should be thread-safe
 --  with the use of mutexes.
 --  This server application can be used with the aaccompanying threaded 
