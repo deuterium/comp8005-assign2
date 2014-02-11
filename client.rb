@@ -164,7 +164,7 @@ threads.each {|t| t.join}
 @data.each {
 	|k,v|
 	temp = v.split(',')
-	diff = Time.parse(temp[3]) - Time.parse(temp[1])
+	diff = Time.parse(temp[4]) - Time.parse(temp[1])
 	puts "#{k}\t#{v}\tRTT: #{diff}sec"
 	begin
 		File.open("#{LOG_NAME}#{time2}", 'a') { |f| f.write ("#{k}\t#{v}\tRTT: #{diff}sec\n") }
