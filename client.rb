@@ -167,7 +167,7 @@ threads.each {|t| t.join}
 	diff = Time.parse(temp[3]) - Time.parse(temp[1])
 	puts "#{k}\t#{v}\tRTT: #{diff}sec"
 	begin
-		File.open("#{LOG_NAME}#{time2}", 'a') { |f| f.write ("#{k}\t#{v}\tRTT: #{diff}sec") }
+		File.open("#{LOG_NAME}#{time2}", 'a') { |f| f.write ("#{k}\t#{v}\tRTT: #{diff}sec\n") }
 	rescue Exception => e
 		# problem opening/writing to file
 		print_exception(e)
