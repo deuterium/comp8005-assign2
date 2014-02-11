@@ -34,6 +34,7 @@ require 'socket'
 require 'thread'
 require 'time'
 
+## Variables
 # default port for program
 default_port = 8005
 # String constants
@@ -101,7 +102,7 @@ def data_add(k, v)
     end
 end
 
-## Main
+## Main Start
 if ARGV.empty? || ARGV.count > 3
 	puts "Proper usage: ./client.rb server_addr [server_port] [numClients]"
 	exit
@@ -173,3 +174,5 @@ threads.each {|t| t.join}
 		print_exception(e)
 	end
 }
+
+## Main end

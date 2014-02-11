@@ -30,6 +30,7 @@
 require 'socket'
 require 'thread'
 
+## Variables
 # String constants
 SRV_MSG, MAX_CON, LOG_NAME, SRV_STOP, SRV_START =
     "^^ Server Output ^^", "Total clients connected",
@@ -196,7 +197,7 @@ def xfer_total
 end
 
 
-## Main
+## Main Start
 STDOUT.sync = true
 
 if ARGV.count > 1
@@ -263,3 +264,4 @@ loop {
     end
 }
 
+## Main end
