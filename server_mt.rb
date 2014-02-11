@@ -1,4 +1,4 @@
-#!/usr/bin/ruby
+#!/usr/bin/env ruby
 =begin
 -------------------------------------------------------------------------------------
 --  SOURCE FILE:    server_mt.rb - A multi-threaded echo server

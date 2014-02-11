@@ -1,4 +1,4 @@
-#!/usr/bin/ruby
+#!/usr/bin/env ruby
 =begin
 -------------------------------------------------------------------------------------
 --  SOURCE FILE:    client.rb - A multi-threaded echo client
@@ -32,13 +32,16 @@
 
 require 'socket'
 require 'thread'
+require 'time'
 
 # default port for program
 default_port = 8005
 # String constants
 LOG_NAME = "client_log"
 # variable locks
-@lock = Mutex.new
+@lock, @lock2 = Mutex.new, Mutex.new
+# data structures
+@data = Hash.new
 
 ## Functions
 # Returns the server's time
@@ -48,6 +51,15 @@ LOG_NAME = "client_log"
 def time
 	t = Time.now
 	return t.strftime("%Y-%m-%d %H:%M:%S")
+end
+
+# Returns the server's time
+# * *Returns* :
+#   - the system time (format HH-MM-SS)
+#
+def time2
+	t = Time.now
+	return t.strftime("%H-%M-%S")
 end
 
 # Prints an exception's error to STDOUT
@@ -70,6 +82,22 @@ def log(msg)
     rescue Exception => e
         # problem opening or writing to file
         print_exception(e)
+    end
+end
+
+# Adds a message with a key to the data dictionary.
+# Used for storing incoming and outgoing connections.
+# * *Args*    :
+#   - +k+ -> key to store data under
+#   - +v+ -> data to store
+#
+def data_add(k, v)
+	@lock2.synchronize do 
+        if @data[k] == nil # does not exist
+            @data[k] = v
+        else               # exists
+            @data[k] += v
+        end
     end
 end
 
@@ -110,10 +138,11 @@ threads = (1..numClients.to_i).map do |t|
 		end
 		begin
 			(1..num_messages).each do |i|
-
-				s.puts "hello world from #{Thread.current}: #{i}"
-
+				msg = "hello world from #{Thread.current}: #{i}"
+				data_add("#{Thread.current}-#{i}", "out,#{time},#{msg.bytesize},")
+				s.puts msg
 				resp = s.readline
+				data_add("#{Thread.current}-#{i}", "in,#{time}")
 				puts "SERVER REPLY> #{resp}"
 				sleep(rand(1..3))
 			end
@@ -131,4 +160,11 @@ end
 # wait for threads to finish, no zombies
 threads.each {|t| t.join}
 
-puts threads
+
+@data.each {
+	|k,v|
+	temp = v.split(',')
+	diff = Time.parse(temp[3]) - Time.parse(temp[1])
+	puts "#{k}\t#{v}\tRTT: #{diff}sec"
+	File.open("#{LOG_NAME}#{time2}", 'a') { |f| f.write ("#{k}\t#{v}\tRTT: #{diff}sec") }
+}
