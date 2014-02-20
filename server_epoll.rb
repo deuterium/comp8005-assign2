@@ -29,6 +29,7 @@
 
 require 'socket'
 require 'thread'
+require 'eventmachine'
 
 ## Variables
 # String constants
@@ -201,6 +202,23 @@ def xfer_total
 end
 
 
+
+module EchoServer
+    def post_init
+        puts "someone has connected"
+    end
+
+    def receive_data data
+        send_data data
+        #close_connection()
+    end
+
+    def unbind
+        puts "someone has disconnected"
+    end
+end
+
+
 ## Main Start
 STDOUT.sync = true
 
@@ -214,11 +232,18 @@ else
     ARGV.clear
 end
 
+# Note that this will block current thread.
+EventMachine.epoll
+EventMachine.run {
+  EventMachine.start_server "127.0.0.1", port, EchoServer
+}
+
 # thread id of ui control loop saved incase need to use it in future
 # program iterations
-@server, t_id = init_srv(port)
-@reading.push(@server)
+#@server, t_id = init_srv(port)
+#@reading.push(@server)
 
+=begin
 # Server loop
 loop {
     begin 
@@ -289,5 +314,6 @@ loop {
         end
     end
 }
+=end
 
 ## Main end
