@@ -38,14 +38,9 @@ SRV_MSG, MAX_CON, LOG_NAME, SRV_STOP, SRV_START =
     "server_epoll_log", "User shutdown received. Stopping Server.\n", 
     "Server started. Accepting connections.\n"
 # default port and client tracking variables
-default_port, @num_clients, @max_clients = 8005, 0, 0
-# Variable locks,
-@lock, @lock2, @lock3, @lock4, @lock5 = 
-    Mutex.new, Mutex.new, Mutex.new, Mutex.new, Mutex.new
+default_port, $num_clients, $max_clients = 8005, 0, 0
 # output & data transfer key/value dictionary
-@ctl_msg, @xfer = Hash.new, Hash.new
-# stream arrays for select
-@reading, @writing = Array.new, Array.new
+$ctl_msg, $xfer = Hash.new, Hash.new
 
 ## Functions
 # Returns the server's time
@@ -71,31 +66,18 @@ end
 #
 def log(msg)
     begin
-        @lock3.synchronize do 
-            File.open(LOG_NAME, 'a') { |f| f.write ("#{time}: #{msg}") }
-        end
+        File.open(LOG_NAME, 'a') { |f| f.write ("#{time}: #{msg}") }
     rescue Exception => e
         # problem opening or writing to file
         print_exception(e)
     end
 end
 
-# Sets up the listening server for the program and 
-# initializes output control loop thread
-# * *Args*    :
-#   - +port+ -> port to turn the listening server on
+# Initializes output control loop thread
 # * *Returns* :
-#   - +srv+ -> server listening socket
 #   - +t+ -> thread id of output control loop
 #
-def init_srv(port)
-    begin
-        srv = TCPServer.open(port)
-    rescue Exception => e
-        #problem opening listening socket..probs should exit
-        print_exception(e)
-        exit!
-    end 
+def init_disp
     log(SRV_START)
 
     t = Thread.new {
@@ -103,9 +85,7 @@ def init_srv(port)
             system "clear"
             output_print
             puts SRV_MSG
-            @lock.synchronize do
-                puts "SERVER CONNECTIONS> #{@num_clients}"
-            end
+            puts "SERVER CONNECTIONS> #{$num_clients}"
             sleep 0.4
 
             # repeat output with additional .
@@ -113,13 +93,11 @@ def init_srv(port)
             system "clear"
             output_print
             puts SRV_MSG
-            @lock.synchronize do
-                puts "SERVER CONNECTIONS> #{@num_clients} ."
-            end
+            puts "SERVER CONNECTIONS> #{$num_clients} ."
             sleep 0.4
         end
     }
-    return srv, t
+    return t
 end
 
 # Adds a message with a key to the output dictionary
@@ -128,9 +106,7 @@ end
 #   - +v+ -> message to store
 #
 def output_append(k, v)
-    @lock2.synchronize do 
-        @ctl_msg[k] = v
-    end
+    $ctl_msg[k] = v
 end
 
 # Removes a message from the output dictionary using the key
@@ -138,17 +114,13 @@ end
 #   - +k+ -> key on which to remove message
 #
 def output_remove(k)
-    @lock2.synchronize do 
-        @ctl_msg.delete(k)
-    end
+        $ctl_msg.delete(k)
 end
 
 # Iterates the output dictionary and outputs only the values
 #
 def output_print
-    @lock2.synchronize do 
-        @ctl_msg.each {|k, v| puts v}
-    end
+    $ctl_msg.each {|k, v| puts v}
 end
 
 # Adds a message with a key to the transfer dictionary.
@@ -159,12 +131,10 @@ end
 #   - +v+ -> message to store
 #
 def xfer_append(k, v)
-    @lock4.synchronize do 
-        if @xfer[k] == nil # does not exist
-            @xfer[k] = v
-        else               # exists
-            @xfer[k] += v
-        end
+    if $xfer[k] == nil # does not exist
+        $xfer[k] = v
+    else               # exists
+        $xfer[k] += v
     end
 end
 
@@ -173,28 +143,24 @@ end
 # of data received and sent per client.
 #
 def xfer_out
-    @lock4.synchronize do
-        File.open(LOG_NAME, 'a') { |f| 
-            @xfer.each { |k, v|
-                f.write("#{k},#{v}\n")
-            }
+    File.open(LOG_NAME, 'a') { |f| 
+        $xfer.each { |k, v|
+            f.write("#{k},#{v}\n")
         }
-    end
+    }
 end
 
 # Totals the xfer stats stored in the xfer dictionary.
 #
 def xfer_total
     t_in, t_out = 0, 0
-    @lock4.synchronize do
-        @xfer.each { |k, v|
-            if k.include? "_IN"
-                t_in += v
-            elsif k.include? "_OUT"
-                t_out += v
-            end     
-        }
-    end
+    $xfer.each { |k, v|
+        if k.include? "_IN"
+            t_in += v
+        elsif k.include? "_OUT"
+            t_out += v
+        end     
+    }
 
     xfer_append("Total bytes transfered in", t_in)
     xfer_append("Total bytes transfered out", t_out)
@@ -205,16 +171,26 @@ end
 
 module EchoServer
     def post_init
-        puts "someone has connected"
+        $num_clients += 1
+        $max_clients += 1
+
+        client = get_peername[2,6].unpack("nC4").join(",") # remote_hostname
+        output_append(client, "#{client} is connected")
     end
 
     def receive_data data
+        client = get_peername[2,6].unpack("nC4").join(",") # remote_hostname
+        xfer_append("#{client}_IN", data.bytesize)
         send_data data
+        xfer_append("#{client}_OUT", data.bytesize)
+        log("#{client}: #{data}")
         #close_connection()
     end
 
     def unbind
-        puts "someone has disconnected"
+        $max_clients -= 1
+        client = get_peername[2,6].unpack("nC4").join(",") # remote_hostname
+        #output_remove(client)
     end
 end
 
@@ -232,47 +208,33 @@ else
     ARGV.clear
 end
 
-# Note that this will block current thread.
-EventMachine.epoll
-EventMachine.run {
-  EventMachine.start_server "127.0.0.1", port, EchoServer
-}
+#
+t_id = init_disp
 
-# thread id of ui control loop saved incase need to use it in future
-# program iterations
-#@server, t_id = init_srv(port)
-#@reading.push(@server)
-
+# Server loop; Note that this will block current thread.
+begin 
+    EventMachine.epoll
+    EventMachine.run {
+      EventMachine.start_server "127.0.0.1", port, EchoServer
+    }
+rescue SignalException => c # ctrl-c => SERVER SHUTDOWN
+    log(SRV_STOP)
+    xfer_append(MAX_CON, @max_clients)
+    xfer_total
+    xfer_out
+    system("clear")
+    puts SRV_STOP
+    exit!
+#rescue Exception => e
+ #   print_exception(e)
+end
 =begin
-# Server loop
-loop {
-    begin 
-        @lock5.synchronize {
-            # blocking call?
-            @readable, writable = IO.select(@reading, @writing)
-        }
-    rescue IOError
-        # assume this is coming from select trying to read sockets before
-        # thread has a chance to close it
-    rescue SignalException => c # ctrl-c => SERVER SHUTDOWN
-                log(SRV_STOP)
-                xfer_append(MAX_CON, @max_clients)
-                xfer_total
-                xfer_out
-                system("clear")
-                puts SRV_STOP
-                exit!
-    rescue Exception => e
-        print_exception(e)
-    end
+
     @readable.each do |socket|
         if socket == @server
             begin
                 Thread.start(@server.accept_nonblock) do |c|
-                    @lock5.synchronize {
-                        @reading.push(c) # add to array of sockets
-                    }
-                    
+
                     sock_domain, remote_port, 
                         remote_hostname, @remote_ip = c.peeraddr
                     # local to thread client ID
