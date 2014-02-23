@@ -7,6 +7,7 @@
 --                ./server_epoll.rb [listening_port] 
 --
 --  FUNCTIONS:      Ruby Sockets, Ruby EventMachine(epoll)
+--                                http://rubyeventmachine.com/
 --
 --  DATE:           February 4, 2014
 --
@@ -167,30 +168,30 @@ def xfer_total
     xfer_append("Total bytes transfered", t_in+t_out)
 end
 
-
-
+# Module to be used with EventMachine. Provides common namespace for methods
+# that are commonly called by the EventMachine framework.
 module EchoServer
     def post_init
         $num_clients += 1
         $max_clients += 1
 
-        client = get_peername[2,6].unpack("nC4").join(",") # remote_hostname
-        output_append(client, "#{client} is connected")
+        @client = get_peername[2,6].unpack("nC4").join(",") # remote_hostname
+        #@test = client
+        output_append(@client, "#{@client} is connected")
     end
 
     def receive_data data
-        client = get_peername[2,6].unpack("nC4").join(",") # remote_hostname
-        xfer_append("#{client}_IN", data.bytesize)
+        #client = get_peername[2,6].unpack("nC4").join(",") # remote_hostname
+        xfer_append("#{@client}_IN", data.bytesize)
         send_data data
-        xfer_append("#{client}_OUT", data.bytesize)
-        log("#{client}: #{data}")
+        xfer_append("#{@client}_OUT", data.bytesize)
+        log("#{@client}: #{data}")
         #close_connection()
     end
 
     def unbind
-        $max_clients -= 1
-        client = get_peername[2,6].unpack("nC4").join(",") # remote_hostname
-        #output_remove(client)
+        $num_clients -= 1
+        output_remove(@client)
     end
 end
 
@@ -208,7 +209,7 @@ else
     ARGV.clear
 end
 
-#
+# start display thread
 t_id = init_disp
 
 # Server loop; Note that this will block current thread.
@@ -219,63 +220,13 @@ begin
     }
 rescue SignalException => c # ctrl-c => SERVER SHUTDOWN
     log(SRV_STOP)
-    xfer_append(MAX_CON, @max_clients)
+    xfer_append(MAX_CON, $max_clients)
     xfer_total
     xfer_out
     system("clear")
     puts SRV_STOP
     exit!
-#rescue Exception => e
- #   print_exception(e)
+rescue Exception => e
+    print_exception(e)
 end
-=begin
-
-    @readable.each do |socket|
-        if socket == @server
-            begin
-                Thread.start(@server.accept_nonblock) do |c|
-
-                    sock_domain, remote_port, 
-                        remote_hostname, @remote_ip = c.peeraddr
-                    # local to thread client ID
-                    client_num = 0
-                    @lock.synchronize do
-                        @num_clients += 1
-                        @max_clients += 1
-                        client_num = @num_clients
-                    end
-                    client = c.peeraddr[3] # remote_hostname
-                    client_id = "#{client}-#{client_num}-#{rand(0..500)}"
-                    output_append(client_id, "#{client} is connected")
-                    begin
-                        loop do
-                            line = c.readline
-                            xfer_append("#{client_id}_IN", line.bytesize)
-                            c.puts(line)
-                            xfer_append("#{client_id}_OUT", line.bytesize)
-                            log("#{client_id}: #{line}")
-                        end
-                    rescue EOFError # client disconnected
-                        c.close
-                        @lock5.synchronize {
-                            @reading.delete(c)
-                        }
-                        @lock.synchronize do
-                            @num_clients -= 1
-                        end
-                        output_remove(client_id)
-                    rescue Exception => e
-                        # problem reading or writing to/from client
-                        print_exception(e)
-                    end    
-                end
-            rescue Exception => e
-                #problem opening client socket
-                print_exception(e)
-            end
-        end
-    end
-}
-=end
-
 ## Main end
