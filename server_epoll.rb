@@ -171,30 +171,37 @@ end
 # Module to be used with EventMachine. Provides common namespace for methods
 # that are commonly called by the EventMachine framework.
 module EchoServer
+
+    # Method called when EventMachine takes a new incoming connection
+    # Start client tracking, gather info.
+    #
     def post_init
         $num_clients += 1
         $max_clients += 1
 
         @client = get_peername[2,6].unpack("nC4").join(",") # remote_hostname
-        #@test = client
         output_append(@client, "#{@client} is connected")
     end
 
+    # Receives data from client, records size, and echos back to client
+    # * *Args*    :
+    #   - +data+ -> data which is received
+    #
     def receive_data data
-        #client = get_peername[2,6].unpack("nC4").join(",") # remote_hostname
         xfer_append("#{@client}_IN", data.bytesize)
         send_data data
         xfer_append("#{@client}_OUT", data.bytesize)
         log("#{@client}: #{data}")
-        #close_connection()
     end
 
+    # Method called when EventMachine received a FIN on the socket.
+    # Unregister client from server logic.
+    #
     def unbind
         $num_clients -= 1
         output_remove(@client)
     end
 end
-
 
 ## Main Start
 STDOUT.sync = true
@@ -212,11 +219,12 @@ end
 # start display thread
 t_id = init_disp
 
-# Server loop; Note that this will block current thread.
+
 begin 
     EventMachine.epoll
     EventMachine.run {
-      EventMachine.start_server "127.0.0.1", port, EchoServer
+        # Event loop; Note that this will block current thread.
+        EventMachine.start_server "0.0.0.0", port, EchoServer
     }
 rescue SignalException => c # ctrl-c => SERVER SHUTDOWN
     log(SRV_STOP)
