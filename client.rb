@@ -162,13 +162,14 @@ end
 threads.each {|t| t.join}
 
 # calculate time difference between send + receive and verbose
+t = time2
 @data.each {
 	|k,v|
 	temp = v.split(',')
 	diff = Time.parse(temp[4]) - Time.parse(temp[1])
 	puts "#{k}\t#{v}\tRTT: #{diff}sec"
 	begin
-		File.open("#{LOG_NAME}#{time2}", 'a') { |f| f.write ("#{k}\t#{v}\tRTT: #{diff}sec\n") }
+		File.open("#{LOG_NAME}#{t}", 'a') { |f| f.write ("#{k}\t#{v}\tRTT: #{diff}sec\n") }
 	rescue Exception => e
 		# problem opening/writing to file
 		print_exception(e)
