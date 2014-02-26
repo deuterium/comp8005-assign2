@@ -43,6 +43,8 @@ default_port, $num_clients, $max_clients = 8005, 0, 0
 # output & data transfer key/value dictionary
 $ctl_msg, $xfer = Hash.new, Hash.new
 
+$lock = Mutex.new
+
 ## Functions
 # Returns the server's time
 # * *Returns* :
@@ -107,7 +109,9 @@ end
 #   - +v+ -> message to store
 #
 def output_append(k, v)
-    $ctl_msg[k] = v
+	$lock.synchronize do
+    		$ctl_msg[k] = v
+	end
 end
 
 # Removes a message from the output dictionary using the key
@@ -115,13 +119,17 @@ end
 #   - +k+ -> key on which to remove message
 #
 def output_remove(k)
+$lock.synchronize do
         $ctl_msg.delete(k)
+end
 end
 
 # Iterates the output dictionary and outputs only the values
 #
 def output_print
+$lock.synchronize do
     $ctl_msg.each {|k, v| puts v}
+end
 end
 
 # Adds a message with a key to the transfer dictionary.
@@ -132,11 +140,13 @@ end
 #   - +v+ -> message to store
 #
 def xfer_append(k, v)
+$lock.synchronize do
     if $xfer[k] == nil # does not exist
         $xfer[k] = v
     else               # exists
         $xfer[k] += v
     end
+end
 end
 
 # Logs the contents of the xfer dictionary.
@@ -234,7 +244,7 @@ rescue SignalException => c # ctrl-c => SERVER SHUTDOWN
     system("clear")
     puts SRV_STOP
     exit!
-rescue Exception => e
-    print_exception(e)
+#rescue Exception => e
+ #   print_exception(e)
 end
 ## Main end
